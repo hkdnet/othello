@@ -7,14 +7,22 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
-type Game struct{}
+type Game struct {
+	isLeftClick bool
+}
 
 func (g *Game) Update() error {
+	g.isLeftClick = isLeftClick()
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	ebitenutil.DebugPrint(screen, "Hello, World!")
+	message := ""
+	if g.isLeftClick {
+		message += "left click"
+		g.isLeftClick = false
+	}
+	ebitenutil.DebugPrint(screen, message+"\nHello World")
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
@@ -27,4 +35,9 @@ func main() {
 	if err := ebiten.RunGame(&Game{}); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func isLeftClick() bool {
+	return ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) ||
+		ebiten.IsKeyPressed(ebiten.KeyEnter)
 }
