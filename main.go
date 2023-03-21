@@ -14,18 +14,51 @@ const (
 	Empty Cell = iota
 	Black
 	White
+	Wall
 )
+
+func (c Cell) String() string {
+	switch c {
+	case Empty:
+		return "."
+	case Black:
+		return "x"
+	case White:
+		return "o"
+	case Wall:
+		return "#"
+
+	}
+	return ""
+}
 
 type Board [][]Cell
 
 type Game struct {
 	board      Board
 	frameCount int
-	cursor     [2]int
+	cursor     Vec2
 
 	turnPlayer Cell
 
 	pressedKey ebiten.Key
+}
+
+var UpLeft, Up, UpRight, Left, Right, DownLeft, Down, DownRight Vec2
+
+var v8 [8]Vec2
+
+func init() {
+	UpLeft = Vec2{-1, -1}
+	Up = Vec2{-1, 0}
+	UpRight = Vec2{-1, +1}
+	Left = Vec2{0, -1}
+	Right = Vec2{0, +1}
+	DownLeft = Vec2{1, -1}
+	Down = Vec2{1, 0}
+	DownRight = Vec2{1, +1}
+
+	v8 = [8]Vec2{UpLeft, Up, UpRight, Left, Right, DownLeft, Down, DownRight}
 }
 
 const size = 6
@@ -42,30 +75,96 @@ func NewGame() *Game {
 	b[x+1][x] = White
 	b[x+1][x+1] = Black
 
-	return &Game{board: b}
+	return &Game{board: b, turnPlayer: Black}
 }
 
 func toText(g *Game) string {
 	s := ""
-	for x, r := range g.board {
-		for y, c := range r {
-			if (g.frameCount/10)%2 == 0 && x == g.cursor[0] && y == g.cursor[1] {
+
+	for y := -1; y <= size; y++ {
+		for x := -1; x <= size; x++ {
+			if (g.frameCount/10)%2 == 0 && x == g.cursor.x && y == g.cursor.y {
 				s += " "
-				continue
-			}
-			switch c {
-			case Empty:
-				s += "."
-			case Black:
-				s += "x"
-			case White:
-				s += "o"
+			} else {
+				s += fmt.Sprint(g.GetCell(Vec2{x, y}))
 			}
 		}
 		s += "\n"
 	}
 	return s
 }
+
+type Vec2 struct {
+	x int
+	y int
+}
+
+func (v1 Vec2) Add(v2 Vec2) Vec2 {
+	return Vec2{x: v1.x + v2.x, y: v1.y + v2.y}
+}
+
+func (g *Game) GetCell(xy Vec2) Cell {
+	if xy.x < 0 || xy.x >= size || xy.y < 0 || xy.y >= size {
+		return Wall
+	}
+	return g.board[xy.y][xy.x]
+}
+func (g *Game) SetCell(v Vec2, c Cell) {
+	g.board[v.y][v.x] = c
+}
+
+func (g *Game) SetCurrentCell(c Cell) {
+	g.SetCell(g.cursor, c)
+}
+
+func (g *Game) GetCurrentCell() Cell {
+	return g.GetCell(g.cursor)
+}
+
+func (g *Game) TargetCells() []Vec2 {
+	var ret []Vec2
+
+	fmt.Printf("=== Checking (%d, %d) at %s's turn ===\n", g.cursor.x, g.cursor.y, g.turnPlayer)
+
+	for _, v := range v8 {
+		fmt.Printf("check (%d, %d) dir\n", v.x, v.y)
+		adjXy := g.cursor.Add(v)
+		adj := g.GetCell(adjXy)
+		var tmp []Vec2
+		isOp := adj == Black && g.turnPlayer == White || adj == White && g.turnPlayer == Black
+		if isOp {
+			fmt.Printf("(%d, %d) is op, ok\n", adjXy.x, adjXy.y)
+			tmp = append(tmp, adjXy)
+			for {
+				adjXy = adjXy.Add(v)
+				adj = g.GetCell(adjXy)
+				if adj == Wall || adj == Empty {
+					fmt.Printf("reached (%d, %d) and it's not op, bye\n", adjXy.x, adjXy.y)
+					break
+				}
+				if adj == g.turnPlayer {
+					ret = append(ret, tmp...)
+					break
+				} else {
+					tmp = append(tmp, adjXy)
+				}
+			}
+		} else {
+			fmt.Printf("(%d, %d) is not op, skipped\n", adjXy.x, adjXy.y)
+		}
+	}
+	return ret
+}
+
+func (g *Game) IsValidCell() bool {
+	if g.GetCurrentCell() != Empty {
+		return false
+	}
+	cells := g.TargetCells()
+
+	return len(cells) > 0
+}
+
 func (g *Game) IncrementCount() {
 	g.frameCount += 1
 	g.frameCount %= 100000
@@ -105,37 +204,45 @@ func (g *Game) Update() error {
 	if oldPressed != g.pressedKey {
 		switch g.pressedKey {
 		case ebiten.KeyLeft:
-			if g.cursor[1] > 0 {
-				g.cursor[1] -= 1
+			if g.cursor.x > 0 {
+				g.cursor.x -= 1
 			}
 		case ebiten.KeyRight:
-			if g.cursor[1] < size-1 {
-				g.cursor[1] += 1
+			if g.cursor.x < size-1 {
+				g.cursor.x += 1
 			}
 		case ebiten.KeyUp:
-			if g.cursor[0] > 0 {
-				g.cursor[0] -= 1
+			if g.cursor.y > 0 {
+				g.cursor.y -= 1
 			}
 		case ebiten.KeyDown:
-			if g.cursor[0] < size-1 {
-				g.cursor[0] += 1
+			if g.cursor.y < size-1 {
+				g.cursor.y += 1
 			}
 		case ebiten.KeyEnter:
-			if g.board[g.cursor[0]][g.cursor[1]] == Empty {
-				if g.turnPlayer == Black {
-					g.board[g.cursor[0]][g.cursor[1]] = Black
-					g.turnPlayer = White
-				} else {
-					g.board[g.cursor[0]][g.cursor[1]] = White
-					g.turnPlayer = Black
+			if g.GetCurrentCell() == Empty {
+				xys := g.TargetCells()
+				if len(xys) > 0 {
+					g.SetCurrentCell(g.turnPlayer)
+					for _, xy := range xys {
+						g.SetCell(xy, g.turnPlayer)
+					}
+					g.ChangeCurrentPlayer()
 				}
 			}
 		}
-
 	}
 
 	g.IncrementCount()
 	return nil
+}
+
+func (g *Game) ChangeCurrentPlayer() {
+	if g.turnPlayer == Black {
+		g.turnPlayer = White
+	} else {
+		g.turnPlayer = Black
+	}
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
