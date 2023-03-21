@@ -70,10 +70,10 @@ func NewGame() *Game {
 	}
 
 	x := (size / 2) - 1
-	b[x][x] = Black
-	b[x][x+1] = White
-	b[x+1][x] = White
-	b[x+1][x+1] = Black
+	b[x][x] = White
+	b[x][x+1] = Black
+	b[x+1][x] = Black
+	b[x+1][x+1] = White
 
 	return &Game{board: b, turnPlayer: Black}
 }
