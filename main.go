@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -21,6 +22,8 @@ type Game struct {
 	board      Board
 	frameCount int
 	cursor     [2]int
+
+	turnPlayer Cell
 
 	pressedKey ebiten.Key
 }
@@ -87,8 +90,16 @@ func (g *Game) Update() error {
 		g.pressedKey = ebiten.KeyDown
 		isNewtral = false
 	}
+	if ebiten.IsKeyPressed(ebiten.KeyEnter) {
+		g.pressedKey = ebiten.KeyEnter
+		isNewtral = false
+	}
+
 	if isNewtral {
 		g.pressedKey = -1
+	} else {
+		// debug
+		fmt.Printf("pressed key = %s\n", g.pressedKey)
 	}
 
 	if oldPressed != g.pressedKey {
@@ -109,7 +120,18 @@ func (g *Game) Update() error {
 			if g.cursor[0] < size-1 {
 				g.cursor[0] += 1
 			}
+		case ebiten.KeyEnter:
+			if g.board[g.cursor[0]][g.cursor[1]] == Empty {
+				if g.turnPlayer == Black {
+					g.board[g.cursor[0]][g.cursor[1]] = Black
+					g.turnPlayer = White
+				} else {
+					g.board[g.cursor[0]][g.cursor[1]] = White
+					g.turnPlayer = Black
+				}
+			}
 		}
+
 	}
 
 	g.IncrementCount()
