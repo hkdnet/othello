@@ -80,13 +80,30 @@ func NewGame() *Game {
 
 func toText(g *Game) string {
 	s := ""
-
+	possibles := g.PossibleXys()
 	for y := -1; y <= size; y++ {
 		for x := -1; x <= size; x++ {
 			if (g.frameCount/10)%2 == 0 && x == g.cursor.x && y == g.cursor.y {
 				s += " "
 			} else {
-				s += fmt.Sprint(g.GetCell(Vec2{x, y}))
+				c := g.GetCell(Vec2{x, y})
+				if c == Empty {
+					isColored := false
+					m, xOk := possibles[x]
+					if xOk {
+						b, yOk := m[y]
+						if yOk && b {
+							isColored = true
+						}
+					}
+					if isColored {
+						s += ":"
+					} else {
+						s += fmt.Sprint(c)
+					}
+				} else {
+					s += fmt.Sprint(c)
+				}
 			}
 		}
 		s += "\n"
@@ -121,25 +138,35 @@ func (g *Game) GetCurrentCell() Cell {
 	return g.GetCell(g.cursor)
 }
 
-func (g *Game) TargetCells() []Vec2 {
+func (g *Game) PossibleXys() map[int]map[int]bool {
+	ret := make(map[int]map[int]bool)
+	for x := 0; x < size; x += 1 {
+		ret[x] = make(map[int]bool)
+
+		for y := 0; y < size; y += 1 {
+			xy := Vec2{x: x, y: y}
+			if g.GetCell(xy) == Empty && len(g.ReversedXys(xy)) > 0 {
+				ret[x][y] = true
+			}
+		}
+	}
+	return ret
+}
+
+func (g *Game) ReversedXys(start Vec2) []Vec2 {
 	var ret []Vec2
 
-	fmt.Printf("=== Checking (%d, %d) at %s's turn ===\n", g.cursor.x, g.cursor.y, g.turnPlayer)
-
 	for _, v := range v8 {
-		fmt.Printf("check (%d, %d) dir\n", v.x, v.y)
-		adjXy := g.cursor.Add(v)
+		adjXy := start.Add(v)
 		adj := g.GetCell(adjXy)
 		var tmp []Vec2
 		isOp := adj == Black && g.turnPlayer == White || adj == White && g.turnPlayer == Black
 		if isOp {
-			fmt.Printf("(%d, %d) is op, ok\n", adjXy.x, adjXy.y)
 			tmp = append(tmp, adjXy)
 			for {
 				adjXy = adjXy.Add(v)
 				adj = g.GetCell(adjXy)
 				if adj == Wall || adj == Empty {
-					fmt.Printf("reached (%d, %d) and it's not op, bye\n", adjXy.x, adjXy.y)
 					break
 				}
 				if adj == g.turnPlayer {
@@ -149,8 +176,6 @@ func (g *Game) TargetCells() []Vec2 {
 					tmp = append(tmp, adjXy)
 				}
 			}
-		} else {
-			fmt.Printf("(%d, %d) is not op, skipped\n", adjXy.x, adjXy.y)
 		}
 	}
 	return ret
@@ -160,7 +185,7 @@ func (g *Game) IsValidCell() bool {
 	if g.GetCurrentCell() != Empty {
 		return false
 	}
-	cells := g.TargetCells()
+	cells := g.ReversedXys(g.cursor)
 
 	return len(cells) > 0
 }
@@ -196,9 +221,6 @@ func (g *Game) Update() error {
 
 	if isNewtral {
 		g.pressedKey = -1
-	} else {
-		// debug
-		fmt.Printf("pressed key = %s\n", g.pressedKey)
 	}
 
 	if oldPressed != g.pressedKey {
@@ -221,7 +243,7 @@ func (g *Game) Update() error {
 			}
 		case ebiten.KeyEnter:
 			if g.GetCurrentCell() == Empty {
-				xys := g.TargetCells()
+				xys := g.ReversedXys(g.cursor)
 				if len(xys) > 0 {
 					g.SetCurrentCell(g.turnPlayer)
 					for _, xy := range xys {
