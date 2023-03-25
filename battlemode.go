@@ -60,6 +60,17 @@ type BattleMode struct {
 	cursor Vec2
 
 	turnPlayer Cell
+
+	previousTurnSkipped bool
+	GameSet             bool
+}
+
+func toOpponent(c Cell) Cell {
+	if c == Black {
+		return White
+	} else {
+		return Black
+	}
 }
 
 func newBattleMode() *BattleMode {
@@ -80,12 +91,21 @@ func newBattleMode() *BattleMode {
 func (bm *BattleMode) ToText(g *Game) string {
 	s := ""
 	possibles := bm.PossibleXys()
+	bCount := 0
+	wCount := 0
 	for y := -1; y <= size; y++ {
 		for x := -1; x <= size; x++ {
+
+			c := bm.GetCell(Vec2{x, y})
+			switch c {
+			case Black:
+				bCount += 1
+			case White:
+				wCount += 1
+			}
 			if (g.frameCount/10)%2 == 0 && x == bm.cursor.x && y == bm.cursor.y {
 				s += " "
 			} else {
-				c := bm.GetCell(Vec2{x, y})
 				if c == Empty {
 					isColored := false
 					m, xOk := possibles[x]
@@ -106,6 +126,25 @@ func (bm *BattleMode) ToText(g *Game) string {
 			}
 		}
 		s += "\n"
+	}
+
+	s += fmt.Sprintf("%s %d vs %s %d\n", Black, bCount, White, wCount)
+
+	if bm.GameSet {
+		if bCount > wCount {
+			s += fmt.Sprintf("%s won", Black)
+		} else if bCount == wCount {
+			s += fmt.Sprintf("draw")
+		} else {
+			s += fmt.Sprintf("%s won", White)
+		}
+
+	} else {
+		s += fmt.Sprintf("Turn player: %s\n", bm.turnPlayer)
+
+		if bm.previousTurnSkipped {
+			s += fmt.Sprintf("The previous turn of %s was skipped\n", toOpponent(bm.turnPlayer))
+		}
 	}
 	return s
 }
@@ -150,7 +189,7 @@ func (bm *BattleMode) ReversedXys(start Vec2) []Vec2 {
 		adjXy := start.Add(v)
 		adj := bm.GetCell(adjXy)
 		var tmp []Vec2
-		isOp := adj == Black && bm.turnPlayer == White || adj == White && bm.turnPlayer == Black
+		isOp := adj == toOpponent(bm.turnPlayer)
 		if isOp {
 			tmp = append(tmp, adjXy)
 			for {
@@ -206,14 +245,36 @@ func (bm *BattleMode) Down(g *Game) {
 func (bm *BattleMode) Enter(g *Game) {
 	if bm.GetCurrentCell() == Empty {
 		xys := bm.ReversedXys(bm.cursor)
-		if len(xys) > 0 {
-			bm.SetCurrentCell(bm.turnPlayer)
-			for _, xy := range xys {
-				bm.SetCell(xy, bm.turnPlayer)
-			}
+		if len(xys) == 0 {
+			// invalid input, ignore the enter
+			return
+		}
+		bm.SetCurrentCell(bm.turnPlayer)
+		for _, xy := range xys {
+			bm.SetCell(xy, bm.turnPlayer)
+		}
+		bm.ChangeCurrentPlayer()
+		if bm.HasValidCell() {
+			bm.previousTurnSkipped = false
+		} else {
+			bm.previousTurnSkipped = true
 			bm.ChangeCurrentPlayer()
+			if !bm.HasValidCell() {
+				bm.GameSet = true
+			}
 		}
 	}
+}
+
+func (bm *BattleMode) HasValidCell() bool {
+	for _, m := range bm.PossibleXys() {
+		for _, ok := range m {
+			if ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 func (bm *BattleMode) ChangeCurrentPlayer() {
 	if bm.turnPlayer == Black {
