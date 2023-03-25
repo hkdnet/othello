@@ -6,10 +6,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-var UpLeft, Up, UpRight, Left, Right, DownLeft, Down, DownRight Vec2
-
-var v8 [8]Vec2
-
 type handler interface {
 	Left(g *Game)
 	Right(g *Game)
@@ -31,15 +27,6 @@ func init() {
 	DownRight = Vec2{1, +1}
 
 	v8 = [8]Vec2{UpLeft, Up, UpRight, Left, Right, DownLeft, Down, DownRight}
-}
-
-type Vec2 struct {
-	x int
-	y int
-}
-
-func (v1 Vec2) Add(v2 Vec2) Vec2 {
-	return Vec2{x: v1.x + v2.x, y: v1.y + v2.y}
 }
 
 func main() {

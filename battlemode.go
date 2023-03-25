@@ -180,11 +180,6 @@ func (bm *BattleMode) IsValidCell() bool {
 	return len(cells) > 0
 }
 
-func (g *Game) IncrementCount() {
-	g.frameCount += 1
-	g.frameCount %= 100000
-}
-
 func (bm *BattleMode) Left(g *Game) {
 	if bm.cursor.x > 0 {
 		bm.cursor.x -= 1
