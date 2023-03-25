@@ -35,18 +35,47 @@ func (c Cell) String() string {
 type Board [][]Cell
 
 type Game struct {
-	board      Board
-	frameCount int
-	cursor     Vec2
-
-	turnPlayer Cell
+	handler handler
 
 	pressedKey ebiten.Key
+	frameCount int
 }
 
 var UpLeft, Up, UpRight, Left, Right, DownLeft, Down, DownRight Vec2
 
 var v8 [8]Vec2
+
+type BattleMode struct {
+	board  Board
+	cursor Vec2
+
+	turnPlayer Cell
+}
+
+func newBattleMode() *BattleMode {
+	b := make([][]Cell, size)
+	for i := 0; i < size; i += 1 {
+		b[i] = make([]Cell, size)
+	}
+
+	x := (size / 2) - 1
+	b[x][x] = White
+	b[x][x+1] = Black
+	b[x+1][x] = Black
+	b[x+1][x+1] = White
+
+	return &BattleMode{board: b, turnPlayer: Black}
+}
+
+type handler interface {
+	Left(g *Game)
+	Right(g *Game)
+	Up(g *Game)
+	Down(g *Game)
+	Enter(g *Game)
+
+	ToText(g *Game) string
+}
 
 func init() {
 	UpLeft = Vec2{-1, -1}
@@ -64,29 +93,19 @@ func init() {
 const size = 6
 
 func NewGame() *Game {
-	b := make([][]Cell, size)
-	for i := 0; i < size; i += 1 {
-		b[i] = make([]Cell, size)
-	}
-
-	x := (size / 2) - 1
-	b[x][x] = White
-	b[x][x+1] = Black
-	b[x+1][x] = Black
-	b[x+1][x+1] = White
-
-	return &Game{board: b, turnPlayer: Black}
+	initialMode := newBattleMode()
+	return &Game{handler: initialMode}
 }
 
-func toText(g *Game) string {
+func (bm *BattleMode) ToText(g *Game) string {
 	s := ""
-	possibles := g.PossibleXys()
+	possibles := bm.PossibleXys()
 	for y := -1; y <= size; y++ {
 		for x := -1; x <= size; x++ {
-			if (g.frameCount/10)%2 == 0 && x == g.cursor.x && y == g.cursor.y {
+			if (g.frameCount/10)%2 == 0 && x == bm.cursor.x && y == bm.cursor.y {
 				s += " "
 			} else {
-				c := g.GetCell(Vec2{x, y})
+				c := bm.GetCell(Vec2{x, y})
 				if c == Empty {
 					isColored := false
 					m, xOk := possibles[x]
@@ -120,32 +139,32 @@ func (v1 Vec2) Add(v2 Vec2) Vec2 {
 	return Vec2{x: v1.x + v2.x, y: v1.y + v2.y}
 }
 
-func (g *Game) GetCell(xy Vec2) Cell {
+func (bm *BattleMode) GetCell(xy Vec2) Cell {
 	if xy.x < 0 || xy.x >= size || xy.y < 0 || xy.y >= size {
 		return Wall
 	}
-	return g.board[xy.y][xy.x]
+	return bm.board[xy.y][xy.x]
 }
-func (g *Game) SetCell(v Vec2, c Cell) {
-	g.board[v.y][v.x] = c
-}
-
-func (g *Game) SetCurrentCell(c Cell) {
-	g.SetCell(g.cursor, c)
+func (bm *BattleMode) SetCell(v Vec2, c Cell) {
+	bm.board[v.y][v.x] = c
 }
 
-func (g *Game) GetCurrentCell() Cell {
-	return g.GetCell(g.cursor)
+func (bm *BattleMode) SetCurrentCell(c Cell) {
+	bm.SetCell(bm.cursor, c)
 }
 
-func (g *Game) PossibleXys() map[int]map[int]bool {
+func (bm *BattleMode) GetCurrentCell() Cell {
+	return bm.GetCell(bm.cursor)
+}
+
+func (bm *BattleMode) PossibleXys() map[int]map[int]bool {
 	ret := make(map[int]map[int]bool)
 	for x := 0; x < size; x += 1 {
 		ret[x] = make(map[int]bool)
 
 		for y := 0; y < size; y += 1 {
 			xy := Vec2{x: x, y: y}
-			if g.GetCell(xy) == Empty && len(g.ReversedXys(xy)) > 0 {
+			if bm.GetCell(xy) == Empty && len(bm.ReversedXys(xy)) > 0 {
 				ret[x][y] = true
 			}
 		}
@@ -153,23 +172,23 @@ func (g *Game) PossibleXys() map[int]map[int]bool {
 	return ret
 }
 
-func (g *Game) ReversedXys(start Vec2) []Vec2 {
+func (bm *BattleMode) ReversedXys(start Vec2) []Vec2 {
 	var ret []Vec2
 
 	for _, v := range v8 {
 		adjXy := start.Add(v)
-		adj := g.GetCell(adjXy)
+		adj := bm.GetCell(adjXy)
 		var tmp []Vec2
-		isOp := adj == Black && g.turnPlayer == White || adj == White && g.turnPlayer == Black
+		isOp := adj == Black && bm.turnPlayer == White || adj == White && bm.turnPlayer == Black
 		if isOp {
 			tmp = append(tmp, adjXy)
 			for {
 				adjXy = adjXy.Add(v)
-				adj = g.GetCell(adjXy)
+				adj = bm.GetCell(adjXy)
 				if adj == Wall || adj == Empty {
 					break
 				}
-				if adj == g.turnPlayer {
+				if adj == bm.turnPlayer {
 					ret = append(ret, tmp...)
 					break
 				} else {
@@ -181,11 +200,11 @@ func (g *Game) ReversedXys(start Vec2) []Vec2 {
 	return ret
 }
 
-func (g *Game) IsValidCell() bool {
-	if g.GetCurrentCell() != Empty {
+func (bm *BattleMode) IsValidCell() bool {
+	if bm.GetCurrentCell() != Empty {
 		return false
 	}
-	cells := g.ReversedXys(g.cursor)
+	cells := bm.ReversedXys(bm.cursor)
 
 	return len(cells) > 0
 }
@@ -193,6 +212,42 @@ func (g *Game) IsValidCell() bool {
 func (g *Game) IncrementCount() {
 	g.frameCount += 1
 	g.frameCount %= 100000
+}
+
+func (bm *BattleMode) Left(g *Game) {
+	if bm.cursor.x > 0 {
+		bm.cursor.x -= 1
+	}
+}
+
+func (bm *BattleMode) Right(g *Game) {
+	if bm.cursor.x < size-1 {
+		bm.cursor.x += 1
+	}
+}
+func (bm *BattleMode) Up(g *Game) {
+	if bm.cursor.y > 0 {
+		bm.cursor.y -= 1
+	}
+}
+
+func (bm *BattleMode) Down(g *Game) {
+	if bm.cursor.y < size-1 {
+		bm.cursor.y += 1
+	}
+}
+
+func (bm *BattleMode) Enter(g *Game) {
+	if bm.GetCurrentCell() == Empty {
+		xys := bm.ReversedXys(bm.cursor)
+		if len(xys) > 0 {
+			bm.SetCurrentCell(bm.turnPlayer)
+			for _, xy := range xys {
+				bm.SetCell(xy, bm.turnPlayer)
+			}
+			bm.ChangeCurrentPlayer()
+		}
+	}
 }
 func (g *Game) Update() error {
 	oldPressed := g.pressedKey
@@ -226,32 +281,15 @@ func (g *Game) Update() error {
 	if oldPressed != g.pressedKey {
 		switch g.pressedKey {
 		case ebiten.KeyLeft:
-			if g.cursor.x > 0 {
-				g.cursor.x -= 1
-			}
+			g.handler.Left(g)
 		case ebiten.KeyRight:
-			if g.cursor.x < size-1 {
-				g.cursor.x += 1
-			}
+			g.handler.Right(g)
 		case ebiten.KeyUp:
-			if g.cursor.y > 0 {
-				g.cursor.y -= 1
-			}
+			g.handler.Up(g)
 		case ebiten.KeyDown:
-			if g.cursor.y < size-1 {
-				g.cursor.y += 1
-			}
+			g.handler.Down(g)
 		case ebiten.KeyEnter:
-			if g.GetCurrentCell() == Empty {
-				xys := g.ReversedXys(g.cursor)
-				if len(xys) > 0 {
-					g.SetCurrentCell(g.turnPlayer)
-					for _, xy := range xys {
-						g.SetCell(xy, g.turnPlayer)
-					}
-					g.ChangeCurrentPlayer()
-				}
-			}
+			g.handler.Enter(g)
 		}
 	}
 
@@ -259,16 +297,16 @@ func (g *Game) Update() error {
 	return nil
 }
 
-func (g *Game) ChangeCurrentPlayer() {
-	if g.turnPlayer == Black {
-		g.turnPlayer = White
+func (bm *BattleMode) ChangeCurrentPlayer() {
+	if bm.turnPlayer == Black {
+		bm.turnPlayer = White
 	} else {
-		g.turnPlayer = Black
+		bm.turnPlayer = Black
 	}
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	ebitenutil.DebugPrint(screen, toText(g))
+	ebitenutil.DebugPrint(screen, g.handler.ToText(g))
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
