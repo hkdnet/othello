@@ -13,7 +13,7 @@ type handler interface {
 	Down(g *Game)
 	Enter(g *Game)
 
-	ToText(g *Game) string
+	Draw(screen *ebiten.Image, g *Game)
 }
 
 func init() {

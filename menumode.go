@@ -1,5 +1,10 @@
 package main
 
+import (
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+)
+
 type MenuMode struct {
 	selected int
 }
@@ -31,8 +36,7 @@ func NewMenuMode() *MenuMode {
 	return &MenuMode{}
 }
 
-func (mm *MenuMode) ToText(g *Game) string {
-
+func (mm *MenuMode) Draw(screen *ebiten.Image, g *Game) {
 	s := ""
 	for idx, item := range menuItems {
 		if (g.frameCount/10)%2 == 0 && idx == mm.selected {
@@ -42,7 +46,8 @@ func (mm *MenuMode) ToText(g *Game) string {
 		}
 		s += "\n"
 	}
-	return s
+
+	ebitenutil.DebugPrint(screen, s)
 }
 
 func (mm *MenuMode) Left(g *Game) {

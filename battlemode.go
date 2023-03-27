@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 var UpLeft, Up, UpRight, Left, Right, DownLeft, Down, DownRight Vec2
@@ -88,7 +91,7 @@ func newBattleMode() *BattleMode {
 	return &BattleMode{board: b, turnPlayer: Black}
 }
 
-func (bm *BattleMode) ToText(g *Game) string {
+func (bm *BattleMode) Draw(screen *ebiten.Image, g *Game) {
 	s := ""
 	possibles := bm.PossibleXys()
 	bCount := 0
@@ -146,7 +149,8 @@ func (bm *BattleMode) ToText(g *Game) string {
 			s += fmt.Sprintf("The previous turn of %s was skipped\n", toOpponent(bm.turnPlayer))
 		}
 	}
-	return s
+
+	ebitenutil.DebugPrint(screen, s)
 }
 
 func (bm *BattleMode) GetCell(xy Vec2) Cell {
