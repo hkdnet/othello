@@ -1,17 +1,62 @@
 package main
 
 import (
-	"fmt"
+	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
+var BlackImage, WhiteImage, CursorImage, EmptyCellImage, BackgroundImage *ebiten.Image
+
+var BackgroundDrawImageOptions *ebiten.DrawImageOptions
+
+var BackgruondColor = color.RGBA{G: 102, A: 255}
+
 var UpLeft, Up, UpRight, Left, Right, DownLeft, Down, DownRight Vec2
+
+const cellWidth = 16
+const boardTopLeftX = 120.0 - (size/2)*cellWidth
+const boardTopLeftY = 60.0 - (size/2)*cellWidth
 
 var v8 [8]Vec2
 
 func init() {
+	// color
+	BlackImage = ebiten.NewImage(16, 16)
+	BlackImage.Fill(color.Transparent)
+	ebitenutil.DrawCircle(BlackImage, 8, 8, 7, color.Black)
+
+	WhiteImage = ebiten.NewImage(16, 16)
+	WhiteImage.Fill(color.Transparent)
+	ebitenutil.DrawCircle(WhiteImage, 8, 8, 7, color.White)
+
+	EmptyCellImage = ebiten.NewImage(16, 16)
+	EmptyCellImage.Fill(color.Black)
+	innerCursor := ebiten.NewImage(14, 14)
+	innerCursor.Fill(BackgruondColor)
+	innerGm := ebiten.GeoM{}
+	innerGm.Translate(1.0, 1.0)
+	EmptyCellImage.DrawImage(innerCursor, &ebiten.DrawImageOptions{GeoM: innerGm})
+
+	CursorImage = ebiten.NewImage(16, 16)
+	CursorImage.Fill(color.RGBA{R: 255, G: 255, B: 255, A: 128})
+
+	BackgroundImage = ebiten.NewImage(640, 480)
+	BackgroundImage.Fill(BackgruondColor)
+	for y := 0; y < size; y++ {
+		gm := ebiten.GeoM{}
+		gm.Translate(boardTopLeftX, boardTopLeftY+float64(y)*cellWidth)
+		for x := 0; x < size; x++ {
+			opt := &ebiten.DrawImageOptions{GeoM: gm}
+			BackgroundImage.DrawImage(EmptyCellImage, opt)
+			gm.Translate(cellWidth, 0)
+		}
+	}
+
+	BackgroundDrawImageOptions = &ebiten.DrawImageOptions{}
+
+	// vec2
 	UpLeft = Vec2{-1, -1}
 	Up = Vec2{-1, 0}
 	UpRight = Vec2{-1, +1}
@@ -92,65 +137,28 @@ func newBattleMode() *BattleMode {
 }
 
 func (bm *BattleMode) Draw(screen *ebiten.Image, g *Game) {
-	s := ""
-	possibles := bm.PossibleXys()
-	bCount := 0
-	wCount := 0
-	for y := -1; y <= size; y++ {
-		for x := -1; x <= size; x++ {
+	screen.DrawImage(BackgroundImage, BackgroundDrawImageOptions)
 
+	for y := 0; y <= size; y++ {
+		gm := ebiten.GeoM{}
+		gm.Translate(boardTopLeftX, boardTopLeftY+float64(y)*cellWidth)
+		for x := 0; x <= size; x++ {
 			c := bm.GetCell(Vec2{x, y})
-			switch c {
-			case Black:
-				bCount += 1
-			case White:
-				wCount += 1
+
+			opt := &ebiten.DrawImageOptions{GeoM: gm}
+			if c == Black {
+				screen.DrawImage(BlackImage, opt)
+			} else if c == White {
+				screen.DrawImage(WhiteImage, opt)
 			}
-			if (g.frameCount/10)%2 == 0 && x == bm.cursor.x && y == bm.cursor.y {
-				s += " "
-			} else {
-				if c == Empty {
-					isColored := false
-					m, xOk := possibles[x]
-					if xOk {
-						b, yOk := m[y]
-						if yOk && b {
-							isColored = true
-						}
-					}
-					if isColored {
-						s += ":"
-					} else {
-						s += fmt.Sprint(c)
-					}
-				} else {
-					s += fmt.Sprint(c)
-				}
-			}
-		}
-		s += "\n"
-	}
-
-	s += fmt.Sprintf("%s %d vs %s %d\n", Black, bCount, White, wCount)
-
-	if bm.GameSet {
-		if bCount > wCount {
-			s += fmt.Sprintf("%s won", Black)
-		} else if bCount == wCount {
-			s += fmt.Sprintf("draw")
-		} else {
-			s += fmt.Sprintf("%s won", White)
-		}
-
-	} else {
-		s += fmt.Sprintf("Turn player: %s\n", bm.turnPlayer)
-
-		if bm.previousTurnSkipped {
-			s += fmt.Sprintf("The previous turn of %s was skipped\n", toOpponent(bm.turnPlayer))
+			gm.Translate(cellWidth, 0)
 		}
 	}
-
-	ebitenutil.DebugPrint(screen, s)
+	if (g.frameCount/10)%2 == 0 {
+		cursorGm := ebiten.GeoM{}
+		cursorGm.Translate(boardTopLeftX+float64(bm.cursor.x)*cellWidth, boardTopLeftY+float64(bm.cursor.y)*cellWidth)
+		screen.DrawImage(CursorImage, &ebiten.DrawImageOptions{GeoM: cursorGm})
+	}
 }
 
 func (bm *BattleMode) GetCell(xy Vec2) Cell {

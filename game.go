@@ -16,7 +16,8 @@ type Game struct {
 const size = 6
 
 func NewGame() *Game {
-	initialMode := NewMenuMode()
+	initialMode := newBattleMode()
+	// initialMode := NewImageTestMode()
 	return &Game{handler: initialMode}
 }
 func (g *Game) Update() error {
