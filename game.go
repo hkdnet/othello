@@ -13,10 +13,11 @@ type Game struct {
 	frameCount int
 }
 
-const size = 6
+const size = 8
 
 func NewGame() *Game {
 	initialMode := NewMenuMode()
+	// initialMode := NewImageTestMode()
 	return &Game{handler: initialMode}
 }
 func (g *Game) Update() error {
